@@ -1,0 +1,37 @@
+
+---
+- name: Set ipset entries
+  shell:
+    cmd: |
+      set -o errexit ;
+      CHANGED=1 ;
+      {% if firewalld_ipset.state|default('present') == 'present' or firewalld_ipset.state == 'update' %}
+      {%   if firewalld_ipset.entries is defined %}
+      {%     for entry in firewalld_ipset.entries %}
+      for opt in '' '--permanent'; do
+        if ! firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --query-entry='{{ entry }}' ; then
+          firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --add-entry='{{ entry }}' ;
+          CHANGED=0 ;
+        fi
+      done
+      {%     endfor %}
+      {%   endif %}
+      {%   if firewalld_ipset.disabled_entries is defined %}
+      {%     for entry in firewalld_ipset.disabled_entries %}
+      for opt in '' '--permanent'; do
+        if firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --query-entry='{{ entry }}' ; then
+          firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --remove-entry='{{ entry }}' ;
+          CHANGED=0 ;
+        fi
+      done
+      {%     endfor %}
+      {%   endif %}
+      {% endif %}
+      if [ $CHANGED -eq 0 ] ; then
+        echo "changed";
+      else
+        echo "skipped";
+      fi
+    executable: /bin/bash
+  register: command_result
+  changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'

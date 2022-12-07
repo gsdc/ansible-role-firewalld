@@ -1,0 +1,70 @@
+
+---
+- name: Create custom service
+  shell:
+    cmd: |
+      set -o errexit ;
+      CHANGED=1 ;
+      {% if firewalld_custom_service.state|default('present') == 'present' or firewalld_custom_service.state == 'update' %}
+      if ! firewall-cmd --permanent --get-services | grep -q '\(^\| \){{ firewalld_custom_service.name }}\( \|$\)' ; then
+        firewall-cmd --permanent --new-service='{{ firewalld_custom_service.name }}' ;
+        {% if firewalld_custom_service.short is defined %}
+        firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --set-short='{{ firewalld_custom_service.short }}' ;
+        {% endif %}
+        {% if firewalld_custom_service.description is defined %}
+        firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --set-description='{{ firewalld_custom_service.description }}' ;
+        {% endif %}
+        {% if firewalld_custom_service.ports is defined %}
+        {%   for item in firewalld_custom_service.ports %}
+        firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --add-port='{{ item }}' ;
+        {%   endfor %}
+        {% endif %}
+        CHANGED=0 ;
+      {%   if firewalld_custom_service.state|default('present') == 'update' %}
+      else
+        {% if firewalld_custom_service.short is defined %}
+        if [ "$(firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --get-short)" != "{{ firewalld_custom_service.short }}" ] ; then
+          firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --set-short='{{ firewalld_custom_service.short }}' ;
+          CHANGED=0 ;
+        fi
+        {% endif %}
+        {% if firewalld_custom_service.description is defined %}
+        if [ "$(firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --get-description)" != "{{ firewalld_custom_service.description }}" ] ; then
+          firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --set-description='{{ firewalld_custom_service.description }}' ;
+          CHANGED=0 ;
+        fi
+        {% endif %}
+        {% if firewalld_custom_service.ports is defined %}
+        if [ "$(firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --get-ports)" != "{{ firewalld_custom_service.ports|join(" ") }}" ] ; then
+          for port in $(firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --get-ports) ; do
+            firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --remove-port="${port}" ;
+          done
+          {% for item in firewalld_custom_service.ports %}
+          firewall-cmd --permanent --service='{{ firewalld_custom_service.name }}' --add-port='{{ item }}' ;
+          {% endfor %}
+          CHANGED=0 ;
+        fi
+        {% endif %}
+      {%   endif %}
+      fi
+      {% elif firewalld_custom_service.state == 'absent' %}
+      if firewall-cmd --permanent --get-services | grep -q '\(^\| \){{ firewalld_custom_service.name }}\( \|$\)' ; then
+        firewall-cmd --permanent --delete-service='{{ firewalld_custom_service.name }}' ;
+        CHANGED=0 ;
+      fi
+      {% else %}
+      echo "ERROR: Unknown state: {{ firewalld_custom_service.state }}" ;
+      false ;
+      {% endif %}
+      if [ $CHANGED -eq 0 ] ; then
+        echo "changed";
+      else
+        echo "skipped";
+      fi
+    executable: /bin/bash
+  register: command_result
+  changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'
+
+- name: Update monitor for firewall custom services change
+  set_fact:
+    firewalld_custom_service_changed: "{{ firewalld_custom_service_changed|bool or command_result.changed }}"

@@ -1,0 +1,101 @@
+
+---
+- name: Set zone
+  firewalld:
+    zone: "{{ firewalld_zone.name }}"
+    state: "{{ firewalld_zone.state|default('present') }}"
+    permanent: yes
+    target: "{{ firewalld_zone.target|default(omit) }}"
+  register: firewalld_zone_state
+
+- name: reload firewalld
+  command: firewall-cmd --reload
+  when: firewalld_zone_state.changed
+
+- name: Set zone features
+  block:
+    - name: Set zone masquerade
+      firewalld:
+        masquerade: "{{ firewalld_zone.masquerade }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      when: (firewalld_zone.masquerade is defined)
+
+    - name: Set zone icmp_blocks
+      firewalld:
+        icmp_block: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.icmp_blocks|default([]) }}"
+
+    - name: Set zone icmp_block_inversion
+      firewalld:
+        icmp_block_inversion: "{{ firewalld_zone.icmp_block_inversion }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      when: (firewalld_zone.icmp_block_inversion is defined)
+
+    - name: Add zone sources
+      firewalld:
+        source: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.sources|default([]) }}"
+
+    - name: Add zone interfaces
+      firewalld:
+        interface: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.interfaces|default([]) }}"
+
+    - name: Add zone services
+      firewalld:
+        service: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.services|default([]) }}"
+
+    - name: Add zone port
+      firewalld:
+        port: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.ports|default([]) }}"
+
+    - name: Add zone port forward
+      firewalld:
+        port_forward: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.port_forwards|default([]) }}"
+
+    - name: Add zone rich rule
+      firewalld:
+        rich_rule: "{{ item }}"
+        permanent: true
+        immediate: true
+        state: enabled
+        zone: "{{ firewalld_zone.name }}"
+      loop: "{{ firewalld_zone.rich_rules|default([]) }}"
+
+    - name: Disable firewall zone features
+      include_tasks: config_zone_disabled.yml
+      when: (firewalld_zone.disabled is defined)
+  when: (firewalld_zone.state|default('present') == 'present')

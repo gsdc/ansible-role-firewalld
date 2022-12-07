@@ -1,0 +1,57 @@
+
+---
+- name: Create ipset
+  shell:
+    cmd: |
+      set -o errexit ;
+      CHANGED=1 ;
+      {% if firewalld_ipset.state|default('present') == 'present' or firewalld_ipset.state == 'update' %}
+      if ! firewall-cmd --permanent --get-ipsets | grep -q '\(^\| \){{ firewalld_ipset.name }}\( \|$\)' ; then
+        firewall-cmd --permanent --new-ipset='{{ firewalld_ipset.name }}' --type='{{ firewalld_ipset.type }}' {% if firewalld_ipset.family is defined %} --family='{{ firewalld_ipset.family }}' {% endif %} {% if firewalld_ipset.options is defined %}{% for option in firewalld_ipset.options %} --option='{{ option }}' {% endfor %}{% endif %} ;
+        {% if firewalld_ipset.short is defined %}
+        firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --set-short='{{ firewalld_ipset.short }}' ;
+        {% endif %}
+        {% if firewalld_ipset.description is defined %}
+        firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --set-description='{{ firewalld_ipset.description }}' ;
+        {% endif %}
+        CHANGED=0 ;
+      else
+        if ! firewall-cmd --get-ipsets | grep -q '\(^\| \){{ firewalld_ipset.name }}\( \|$\)'; then
+          CHANGED=0 ;
+        fi
+      {%   if firewalld_ipset.state|default('present') == 'update' %}
+        {% if firewalld_ipset.short is defined %}
+        if [ "$(firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --get-short)" != "{{ firewalld_ipset.short }}" ] ; then
+          firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --set-short='{{ firewalld_ipset.short }}' ;
+          CHANGED=0 ;
+        fi
+        {% endif %}
+        {% if firewalld_ipset.description is defined %}
+        if [ "$(firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --get-description)" != "{{ firewalld_ipset.description }}" ] ; then
+          firewall-cmd --permanent --ipset='{{ firewalld_ipset.name }}' --set-description='{{ firewalld_ipset.description }}' ;
+          CHANGED=0 ;
+        fi
+        {% endif %}
+      {%   endif %}
+      fi
+      {% elif firewalld_ipset.state == 'absent' %}
+      if firewall-cmd --permanent --get-ipsets | grep -q '\(^\| \){{ firewalld_ipset.name }}\( \|$\)' ; then
+        firewall-cmd --permanent --delete-ipset='{{ firewalld_ipset.name }}' ;
+        CHANGED=0 ;
+      fi
+      {% else %}
+      echo "ERROR: Unknown state: {{ firewalld_ipset.state }}" ;
+      false ;
+      {% endif %}
+      if [ $CHANGED -eq 0 ] ; then
+        echo "changed";
+      else
+        echo "skipped";
+      fi
+    executable: /bin/bash
+  register: command_result
+  changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'
+
+- name: Update monitor for firewall ipset change
+  set_fact:
+    firewalld_ipset_changed: "{{ firewalld_ipset_changed|bool or command_result.changed }}"

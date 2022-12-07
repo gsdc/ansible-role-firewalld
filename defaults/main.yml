@@ -1,0 +1,11 @@
+
+---
+firewalld_ipsets: []
+firewalld_custom_services: []
+firewalld_zones: []
+firewalld_direct_disabled_rules: []
+firewalld_direct_disabled_chains: []
+firewalld_direct_enabled_chains: []
+firewalld_direct_enabled_rules: []
+firewalld_default_zone: drop
+firewalld_log_denied: all

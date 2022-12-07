@@ -1,0 +1,82 @@
+
+---
+- name: Unset zone masquerade
+  firewalld:
+    masquerade: "{{ firewalld_zone.disabled.masquerade }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  when: (firewalld_zone.disabled.masquerade is defined)
+
+- name: Unset zone icmp_blocks
+  firewalld:
+    icmp_block: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.icmp_blocks|default([]) }}"
+
+- name: Unset zone icmp_block_inversion
+  firewalld:
+    icmp_block_inversion: "{{ firewalld_zone.disabled.icmp_block_inversion }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  when: (firewalld_zone.disabled.icmp_block_inversion is defined)
+
+- name: Remove zone sources
+  firewalld:
+    source: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.sources|default([]) }}"
+
+- name: Remove zone interfaces
+  firewalld:
+    interface: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.interfaces|default([]) }}"
+
+- name: Remove zone services
+  firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.services|default([]) }}"
+
+- name: Remove zone port
+  firewalld:
+    port: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.ports|default([]) }}"
+
+- name: Remove zone port forward
+  firewalld:
+    port_forward: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.port_forwards|default([]) }}"
+
+- name: Remove zone rich rule
+  firewalld:
+    rich_rule: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: disabled
+    zone: "{{ firewalld_zone.name }}"
+  loop: "{{ firewalld_zone.disabled.rich_rules|default([]) }}"

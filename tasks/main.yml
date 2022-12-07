@@ -1,0 +1,110 @@
+
+---
+- name: Install iptables
+  package: name=iptables state=installed
+  register: install_packages
+  until: install_packages is success
+  retries: 5
+  delay: 3
+
+- name: Install firewalld
+  package: name=firewalld state=installed
+  register: install_packages
+  until: install_packages is success
+  retries: 5
+  delay: 3
+
+- name: Check if iptables-services package is installed
+  yum: list=iptables-services
+  register: result
+
+- name: Disable iptables now and at boot
+  service: name=iptables state=stopped enabled=false masked=true
+  when: result.results[0].yumstate == 'installed'
+
+- name: Run firewalld now and at boot
+  service: name=firewalld state=started enabled=true
+
+- name: Set default zone
+  shell:
+    cmd: |
+      if ! firewall-cmd --get-default-zone | grep '{{ firewalld_default_zone }}' ; then
+        firewall-cmd --set-default-zone='{{ firewalld_default_zone }}' && echo changed;
+      else
+        echo skipped;
+      fi
+    executable: /bin/bash
+  register: command_result
+  changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'
+
+- name: Set log denied
+  shell:
+    cmd: |
+      if ! firewall-cmd --get-log-denied | grep -q '{{ firewalld_log_denied }}' ; then
+        firewall-cmd --set-log-denied='{{ firewalld_log_denied }}' && echo changed;
+      else
+        echo skipped;
+      fi
+    executable: /bin/bash
+  register: command_result
+  changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'
+
+- name: Set monitor for firewall ipset change
+  set_fact:
+    firewalld_ipset_changed: false
+
+- name: Config firewall ipset
+  include_tasks: config_ipset.yml
+  loop: "{{ firewalld_ipsets }}"
+  loop_control:
+    loop_var: firewalld_ipset
+
+- name: Set monitor for firewall custom services change
+  set_fact:
+    firewalld_custom_service_changed: false
+
+- name: Config firewall custom services
+  include_tasks: config_custom_service.yml
+  loop: "{{ firewalld_custom_services }}"
+  loop_control:
+    loop_var: firewalld_custom_service
+
+- name: reload firewalld
+  command: firewall-cmd --reload
+  when: (firewalld_custom_service_changed|bool)
+
+- name: Config firewall ipset entries
+  include_tasks: config_ipset_entries.yml
+  loop: "{{ firewalld_ipsets }}"
+  loop_control:
+    loop_var: firewalld_ipset
+
+- name: Config firewall zones
+  include_tasks: config_zone.yml
+  loop: "{{ firewalld_zones }}"
+  loop_control:
+    loop_var: firewalld_zone
+
+- name: Disable firewall direct rules
+  include_tasks: config_direct_disabled_rules.yml
+  loop: "{{ firewalld_direct_disabled_rules }}"
+  loop_control:
+    loop_var: firewalld_direct_disabled_rule
+
+- name: Disable firewall direct chains
+  include_tasks: config_direct_disabled_chains.yml
+  loop: "{{ firewalld_direct_disabled_chains }}"
+  loop_control:
+    loop_var: firewalld_direct_disabled_chain
+
+- name: Enable firewall direct chains
+  include_tasks: config_direct_enabled_chains.yml
+  loop: "{{ firewalld_direct_enabled_chains }}"
+  loop_control:
+    loop_var: firewalld_direct_enabled_chain
+
+- name: Enable firewall direct rules
+  include_tasks: config_direct_enabled_rules.yml
+  loop: "{{ firewalld_direct_enabled_rules }}"
+  loop_control:
+    loop_var: firewalld_direct_enabled_rule
