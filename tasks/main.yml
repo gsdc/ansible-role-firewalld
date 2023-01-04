@@ -71,7 +71,7 @@
 
 - name: reload firewalld
   command: firewall-cmd --reload
-  when: (firewalld_custom_service_changed|bool)
+  when: (firewalld_ipset_changed|bool or firewalld_custom_service_changed|bool)
 
 - name: Config firewall ipset entries
   include_tasks: config_ipset_entries.yml
