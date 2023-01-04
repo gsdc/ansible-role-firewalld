@@ -95,6 +95,27 @@
         zone: "{{ firewalld_zone.name }}"
       loop: "{{ firewalld_zone.rich_rules|default([]) }}"
 
+    - name: Add zone protocol
+      shell:
+        cmd: |
+          set -o errexit ;
+          CHANGED=1 ;
+          for opt in '' '--permanent'; do
+            if ! firewall-cmd $opt --zone="{{ firewalld_zone.name }}" --query-protocol="{{ item }}" ; then
+              firewall-cmd $opt --zone="{{ firewalld_zone.name }}" --add-protocol="{{ item }}" ;
+              CHANGED=0 ;
+            fi
+          done
+          if [ $CHANGED -eq 0 ] ; then
+            echo "changed";
+          else
+            echo "skipped";
+          fi
+        executable: /bin/bash
+      register: command_result
+      changed_when: command_result.stdout_lines|length > 0 and command_result.stdout_lines[-1] == 'changed'
+      loop: "{{ firewalld_zone.protocols|default([]) }}"
+
     - name: Disable firewall zone features
       include_tasks: config_zone_disabled.yml
       when: (firewalld_zone.disabled is defined)
