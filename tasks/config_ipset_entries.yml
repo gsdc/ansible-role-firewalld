@@ -10,8 +10,13 @@
       {%     for entry in firewalld_ipset.entries %}
       for opt in '' '--permanent'; do
         if ! firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --query-entry='{{ entry }}' ; then
-          firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --add-entry='{{ entry }}' ;
-          CHANGED=0 ;
+          if firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --add-entry='{{ entry }}' ; then
+            CHANGED=0 ;
+          else
+            if ! firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --add-entry='{{ entry }}' 2>&1 | grep 'overlaps with existing entry' ; then
+              firewall-cmd $opt --ipset='{{ firewalld_ipset.name }}' --add-entry='{{ entry }}'
+            fi
+          fi
         fi
       done
       {%     endfor %}
