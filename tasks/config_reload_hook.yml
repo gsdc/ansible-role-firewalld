@@ -1,0 +1,71 @@
+- name: Create firewalld drop-in directory
+  file:
+    path: /etc/systemd/system/firewalld.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: u=rwx,g=rx,o=rx
+
+- name: Create firewalld restart drop-in
+  copy:
+    content: |
+      [Service]
+      ExecStartPost=-/bin/bash -c 'if [ -e /run/firewalld_stopped ]; then /bin/rm /run/firewalld_stopped; /usr/bin/dbus-send --system /org/fedoraproject/FirewallD1 org.fedoraproject.FirewallD1.Reloaded; fi'
+      ExecStopPost=-/bin/touch /run/firewalld_stopped
+    dest: /etc/systemd/system/firewalld.service.d/restart.conf
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+
+# https://gist.github.com/patrickwbarnes/c1dce088e3396d4f3ceacd3312c2248b
+- name: Create firewalld-reload-hook.service
+  copy:
+    content: |
+      [Unit]
+      Description=firewalld reload hook - run a hook script on firewalld reload
+      Wants=network.target network-online.target syslog.service dbus-broker.service
+      After=network.target network-online.target syslog.service dbus-broker.service
+
+      [Service]
+      Type=simple
+      ExecStart=/bin/bash -c '/bin/busctl monitor --system --match "interface=org.fedoraproject.FirewallD1,member=Reloaded" | while read -r line ; do if [ "${line:0:1}" == "‣" ] && [ -x /usr/local/sbin/firewalld-reload-hook ] ; then /usr/local/sbin/firewalld-reload-hook ; fi ; done'
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: /etc/systemd/system/firewalld-reload-hook.service
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+
+- name: Create firewalld-reload-hook
+  copy:
+    content: |
+      #!/usr/bin/env bash
+
+      logger "$BASH_SOURCE: Firewalld reload hook triggered."
+
+      #if systemctl is-active --quiet libvirtd.service ; then
+      #  systemctl restart libvirtd.service
+      #  logger "$BASH_SOURCE: Libvirtd restarted."
+      #fi
+      #if systemctl is-active --quiet virtnetworkd.service ; then
+      #  systemctl restart virtnetworkd.service
+      #  logger "$BASH_SOURCE: virtnetworkd restarted."
+      #fi
+
+      logger "$BASH_SOURCE: podman network reload."
+      podman network reload --all && PODMAN_NETWORK_RELOADED=0 || :
+    dest: /usr/local/sbin/firewalld-reload-hook
+    owner: root
+    group: root
+    mode: u=rwx,g=rx,o=rx
+
+- name: Systemd to reread configs
+  systemd:
+    daemon_reload: yes
+
+- name: Enable and start firewalld-reload-hook.service
+  systemd:
+    name: firewalld-reload-hook.service
+    state: started
+    enabled: yes
