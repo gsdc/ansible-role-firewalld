@@ -53,8 +53,10 @@
       #  logger "$BASH_SOURCE: virtnetworkd restarted."
       #fi
 
-      logger "$BASH_SOURCE: podman network reload."
-      podman network reload --all && PODMAN_NETWORK_RELOADED=0 || :
+      if command -v podman > /dev/null ; then
+        logger "$BASH_SOURCE: podman network reload."
+        podman network reload --all && PODMAN_NETWORK_RELOADED=0 || :
+      fi
     dest: /usr/local/sbin/firewalld-reload-hook
     owner: root
     group: root
